@@ -1,6 +1,6 @@
 import Foundation
 
-enum Direction: CaseIterable {
+fileprivate enum Direction: CaseIterable {
     case N, NE, E, SE, S, SW, W, NW
     func getDiff() -> (Int, Int) {
         switch self {
