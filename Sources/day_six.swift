@@ -20,7 +20,7 @@ fileprivate enum Direction: CaseIterable {
     }
 }
 
-struct Position: Hashable, CustomStringConvertible {
+private struct Position: Hashable, CustomStringConvertible {
     var i: Int
     var j: Int
 
