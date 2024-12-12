@@ -250,11 +250,11 @@ func daySix_partTwo() {
 
 
 
-print("Day six, part one")
-daySix_partOne()
+// print("Day six, part one")
+// daySix_partOne()
 
-print("Day six, part two")
-daySix_partTwo()
+// print("Day six, part two")
+// daySix_partTwo()
 
 
 // Expected solutions for test case part 2:

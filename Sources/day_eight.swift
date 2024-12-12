@@ -185,8 +185,8 @@ func dayEight_partTwo() {
 
 
 
-print("Day eight, part one")
-dayEight_partOne()
+// print("Day eight, part one")
+// dayEight_partOne()
 
-print("Day eight, part two")
-dayEight_partTwo()
+// print("Day eight, part two")
+// dayEight_partTwo()

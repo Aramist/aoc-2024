@@ -182,5 +182,5 @@ func dayNine_partTwo() {
 // print("Day nine, part one")
 // dayNine_partOne()
 
-print("Day nine, part two")
-dayNine_partTwo()
+// print("Day nine, part two")
+// dayNine_partTwo()

@@ -95,5 +95,5 @@ func daySeven_partTwo() {
 // print("Day 7, part 1")
 // daySeven_partOne()
 
-print("Day 7, part 2")
-daySeven_partTwo()
+// print("Day 7, part 2")
+// daySeven_partTwo()

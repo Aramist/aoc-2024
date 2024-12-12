@@ -166,13 +166,13 @@ func dayFour_partTwo() {
     print(ws.countMas())
 }
 
-func main() {
-    print("Day 4 part one")
-    dayFour_partOne()
-    print("Day 4 part two")
-    dayFour_partTwo()
-}
-main()
+// func main() {
+//     print("Day 4 part one")
+//     dayFour_partOne()
+//     print("Day 4 part two")
+//     dayFour_partTwo()
+// }
+// main()
 
 
 

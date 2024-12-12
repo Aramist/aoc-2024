@@ -141,7 +141,7 @@ func dayFive_partTwo() {
     print(sum)
 }
 
-print("Day 5 part 1:")
-dayFive_partOne()
-print("Day 5 part 2:")
-dayFive_partTwo()
+// print("Day 5 part 1:")
+// dayFive_partOne()
+// print("Day 5 part 2:")
+// dayFive_partTwo()

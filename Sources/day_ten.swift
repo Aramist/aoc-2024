@@ -178,5 +178,5 @@ func dayTen_partTwo() {
 // print("Day 10, part 1")
 // dayTen_portOne()
 
-print("Day 10, part 2")
-dayTen_partTwo()
+// print("Day 10, part 2")
+// dayTen_partTwo()
