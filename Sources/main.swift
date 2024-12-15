@@ -56,5 +56,17 @@ import Foundation
 
 // print("Day 11 part one")
 // dayEleven_partOne()
-print("Day 11 part two")
-dayEleven_partTwo()
+// print("Day 11 part two")
+// dayEleven_partTwo()
+
+
+// print("Day 12 part one")
+// dayTwelve_partOne()
+// print("Day 12 part two")
+// dayTwelve_partTwo()
+
+
+print("Day 13 part one")
+dayThirteen_partOne()
+print("Day 13 part two")
+dayThirteen_partTwo()
