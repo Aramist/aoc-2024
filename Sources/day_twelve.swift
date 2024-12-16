@@ -256,7 +256,7 @@ fileprivate class Garden {
     }
 
     func makeHierarchy() -> Hierarchy{
-        var root = Hierarchy(node: nil, children: [])
+        let root = Hierarchy(node: nil, children: [])
         
 
         return root

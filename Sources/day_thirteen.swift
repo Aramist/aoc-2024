@@ -220,7 +220,6 @@ fileprivate func invertLowerTriangular(_ ltri: Mat) -> Mat {
     return result
 }
 
-
 fileprivate func solveLinear(_ A: Mat, _ b: Mat) -> Mat {
     // PA = LU  =>  PAx = LUx  => P^-1B = LUx
     let (P, L, U) = A.LU()
@@ -316,8 +315,6 @@ fileprivate struct Game {
         return feasible.min { $1.dot(c) > $0.dot(c) }
     }
 }
-
-
 
 fileprivate func parseVec(_ str: String) -> Vec {
     let components = str.components(separatedBy: ",")
