@@ -299,14 +299,20 @@ fileprivate struct Map: CustomStringConvertible {
 
     func findAllBestPaths() -> [MovementSequence] {
         var queue = PriorityQueue(ascending: true, startingValues: [MovementSequence([], State(pos: reindeerLoc, dir: reindeerDir))])
-        var visited: Set<State> = []
+        // var visited: Set<State> = []
 
         var bestPaths: [MovementSequence] = []
 
         while let trajectory = queue.pop() {
+            if let curBest = bestPaths.last {
+                // In the edge case where all paths that reach the end are equally optimal
+                // This stops us from exploring all the useless paths after we find the good ones
+                if trajectory.cost > curBest.cost { break }
+            }
+
             let curState = trajectory.state
-            guard !visited.contains(curState) else { continue }
-            visited.insert(curState)
+            // guard !visited.contains(curState) else { continue }
+            // visited.insert(curState)
 
             // Exit conditions
             if self[curState.pos] == .Wall {
@@ -316,10 +322,6 @@ fileprivate struct Map: CustomStringConvertible {
             if self[curState.pos] == .Goal {
                 guard let prevBest = bestPaths.last else {
                     bestPaths.append(trajectory)
-                    // Remove all states in this trajectory from visited
-                    for state in simulate(sequence: trajectory) {
-                        visited.remove(state)
-                    }
                     continue
                 }
                 print(trajectory)
@@ -329,6 +331,8 @@ fileprivate struct Map: CustomStringConvertible {
                     bestPaths.append(trajectory)
                     continue
                 }
+                // Since the pqueue samples low-cost trajectories first, we can break
+                // the moment we get a trajectory that is more expensive
                 return bestPaths
             }
 
@@ -337,7 +341,7 @@ fileprivate struct Map: CustomStringConvertible {
             queue.push(trajectory + .TurnR)
         }
 
-        fatalError("Could not find a viable path")
+        return bestPaths
     }
 }
 
@@ -345,42 +349,42 @@ fileprivate struct Map: CustomStringConvertible {
 fileprivate func parseInput(useTestCase: Bool) -> Map {
     let rawInput: String
     if useTestCase {
-        rawInput = """
-        ###############
-        #.......#....E#
-        #.#.###.#.###.#
-        #.....#.#...#.#
-        #.###.#####.#.#
-        #.#.#.......#.#
-        #.#.#####.###.#
-        #...........#.#
-        ###.#.#####.#.#
-        #...#.....#.#.#
-        #.#.#.###.#.#.#
-        #.....#...#.#.#
-        #.###.#.#.#.#.#
-        #S..#.....#...#
-        ###############
-        """
         // rawInput = """
-        // #################
-        // #...#...#...#..E#
-        // #.#.#.#.#.#.#.#.#
-        // #.#.#.#...#...#.#
-        // #.#.#.#.###.#.#.#
-        // #...#.#.#.....#.#
-        // #.#.#.#.#.#####.#
-        // #.#...#.#.#.....#
-        // #.#.#####.#.###.#
-        // #.#.#.......#...#
-        // #.#.###.#####.###
-        // #.#.#...#.....#.#
-        // #.#.#.#####.###.#
-        // #.#.#.........#.#
-        // #.#.#.#########.#
-        // #S#.............#
-        // #################
+        // ###############
+        // #.......#....E#
+        // #.#.###.#.###.#
+        // #.....#.#...#.#
+        // #.###.#####.#.#
+        // #.#.#.......#.#
+        // #.#.#####.###.#
+        // #...........#.#
+        // ###.#.#####.#.#
+        // #...#.....#.#.#
+        // #.#.#.###.#.#.#
+        // #.....#...#.#.#
+        // #.###.#.#.#.#.#
+        // #S..#.....#...#
+        // ###############
         // """
+        rawInput = """
+        #################
+        #...#...#...#..E#
+        #.#.#.#.#.#.#.#.#
+        #.#.#.#...#...#.#
+        #.#.#.#.###.#.#.#
+        #...#.#.#.....#.#
+        #.#.#.#.#.#####.#
+        #.#...#.#.#.....#
+        #.#.#####.#.###.#
+        #.#.#.......#...#
+        #.#.###.#####.###
+        #.#.#...#.....#.#
+        #.#.#.#####.###.#
+        #.#.#.........#.#
+        #.#.#.#########.#
+        #S#.............#
+        #################
+        """
 
     } else {
         if let fileData = try? String(contentsOfFile: "/Users/atanelus/Downloads/input_day16") {
@@ -406,7 +410,7 @@ func daySixteen_partOne() {
 }
 
 func daySixteen_partTwo() {
-    let map = parseInput(useTestCase: true)
+    let map = parseInput(useTestCase: false)
     let optimalPaths = map.findAllBestPaths()
     print(optimalPaths.count)
     let simulations = optimalPaths.map {map.simulate(sequence: $0)}
