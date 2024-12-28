@@ -1,6 +1,6 @@
 import Foundation
 
-fileprivate func parseInput(useTestCase: Bool) -> [[Character]] {
+fileprivate func parseInput(useTestCase: Bool) -> Garden {
     let rawInput: String
     if useTestCase {
         // rawInput = """
@@ -20,7 +20,7 @@ fileprivate func parseInput(useTestCase: Bool) -> [[Character]] {
         AAACCA
         AAACCA
         ABBAAA
-        ABBAAA
+        ABBADA
         AAAAAA
         """
     } else {
@@ -31,10 +31,13 @@ fileprivate func parseInput(useTestCase: Bool) -> [[Character]] {
         }
     }
 
-    return rawInput.split(separator: "\n").map { Array($0) }
+    let arr_2d = rawInput.split(separator: "\n").map { Array($0) }
+    let shape = (arr_2d.count, arr_2d[0].count)
+    let arr_1d = arr_2d.reduce([], +)
+    return Garden(contents: arr_1d, shape: shape)
 }
 
-fileprivate struct Vec: Hashable {
+fileprivate struct Vec: Hashable, CustomStringConvertible {
     let i: Int
     let j: Int
 
@@ -55,10 +58,22 @@ fileprivate struct Vec: Hashable {
         return lhs + rhs.getDiff()
     }
 
+    var description: String {
+        return "(\(i), \(j))"
+    }
 
 }
 
-fileprivate enum Direction: CaseIterable {
+fileprivate struct DirectedVec: Hashable, CustomStringConvertible {
+    let vec: Vec
+    let dir: Direction
+
+    var description: String {
+        "\(vec) \(dir)"
+    }
+}
+
+fileprivate enum Direction: CaseIterable, CustomStringConvertible {
     case N, E, S, W
     func getDiff() -> Vec {
         switch self {
@@ -86,100 +101,112 @@ fileprivate enum Direction: CaseIterable {
         case .W: return .N
         }
     }
+
+    var description: String {
+        switch self {
+        case .N: return "N"
+        case .E: return "E"
+        case .S: return "S"
+        case .W: return "W"
+        }
+    }
 }
 
 fileprivate class Region: Equatable {
     let id: Character
     let plots: Set<Vec>
-    var externalEdges = 0
-    var interiorEdges = 0
-    var boundaryPlots: Set<Vec> = []
-    weak var garden: Garden?
+    var edgeCount: Int = 0
+    var boundaryPlots: Set<DirectedVec> = []
 
-    init(id: Character, plots: any Sequence<Vec>, parent: Garden) {
+    init(id: Character, plots: any Sequence<Vec>) {
         self.id = id
         self.plots = Set(plots)
-        self.garden = parent
-        self.externalEdges = computeNumExternalEdges()
+        self.populateEdges()
     }
 
     var area: Int {
-        plots.count
+        get { plots.count }
     }
 
     var perimeter: Int {
+        // Does edge detection
         plots.reduce(0) { (acc, plot) in 
+        // For each plot, add 'x' to the accumulator where 'x' is the number of neighbors
+        // to the plot that do not belong to self
             return acc + Direction.allCases.reduce(0) { (acc2, dir) in 
+                // This reduce computes the number of neighbors that do not belong to self
+                // by iterating over all directions
                 let neighborPos = plot + dir
                 return plots.contains(neighborPos) ? acc2 : acc2 + 1
             }
         }
     }
 
-    func computeNumExternalEdges() -> Int {
+    func computeEdges(fromStartPoint start: Vec) -> Int {
         var numEdges = 0
+        var curPlot = start
 
-        // Find a corner plot
-        var curPlot = plots.randomElement()!
-        
-        while plots.contains(curPlot + .N) || plots.contains(curPlot + .W) {
-            if plots.contains(curPlot + .N) {
-                curPlot = curPlot + .N
+        // First make sure this is a boundary plot
+        let numNeighbors = Direction.allCases.reduce(0) { (acc, dir) in
+            return plots.contains(curPlot + dir) ? acc + 1 : acc
+        }
+        guard numNeighbors < 4 else { return 0 }
+
+        // Now we know we are on a boundary plot, start marching
+        // Determine which direction the edge is on
+        let origEdgeDirection: Direction
+        if !contains(curPlot + .N){
+            origEdgeDirection = .N
+        } else if !contains(curPlot + .E) {
+            origEdgeDirection = .E
+        } else if !contains(curPlot + .S) {
+            origEdgeDirection = .S
+        } else {
+            origEdgeDirection = .W
+        }
+        guard !boundaryPlots.contains(DirectedVec(vec: start, dir: origEdgeDirection)) else {
+            return 0
+        }
+
+        var edgeDirection = origEdgeDirection
+        while true {
+            boundaryPlots.insert(DirectedVec(vec: curPlot, dir: edgeDirection))
+            let travelDirection = edgeDirection.right()
+            // See if we can turn left to continue the clockwise traversal
+            if contains(curPlot + edgeDirection) {
+                numEdges += 1
+                curPlot = curPlot + edgeDirection
+                edgeDirection = edgeDirection.left()
+            } else if !contains(curPlot + travelDirection) {
+                // Otherwise, see if the way forward is empty and we need a right turn
+                numEdges += 1
+                edgeDirection = travelDirection
+                // We don't update curPlot because it's possible that this is a 
+                // 1-tile-wide corner
             } else {
-                curPlot = curPlot + .W
+                // No left turn available and we can go forward
+                curPlot = curPlot + travelDirection
+            }
+
+            if (curPlot == start) && (edgeDirection == origEdgeDirection) {
+                break
             }
         }
-        // Now working on a north-west corner plot
-        // Starting on the northern edge, travel east
-        let startPlot = curPlot
-        let startEdge: Direction = .N
-        var travelDirection: Direction = .E
-
-        repeat {
-            boundaryPlots.insert(curPlot)
-            let nextPlot = curPlot + travelDirection
-            if !plots.contains(nextPlot) {  // this case always leads to a new edge becasue we don't count diagonal adjacency
-                numEdges += 1
-                travelDirection = travelDirection.right()
-            } else if plots.contains(nextPlot + travelDirection.left()) {
-                curPlot = nextPlot + travelDirection.left()
-                travelDirection = travelDirection.left()
-                numEdges += 1
-            } else {
-                curPlot = nextPlot
-            }
-        } while !(curPlot == startPlot && travelDirection.left() == startEdge)
+        // If the start point is at a corner, failing to check the edge direction can
+        // lead to us not counting that last corner, as the loop exits one iteration early
 
         return numEdges
     }
 
+    func populateEdges() {
+        for plot in plots {
+            // guard !boundaryPlots.contains(plot) else { continue }
+            let edges = computeEdges(fromStartPoint: Vec(plot.i, plot.j))
+            self.edgeCount += edges
+        }
+    }
     func contains(_ element: Vec) -> Bool {
         plots.contains(element)
-    }
-
-    func getInterior() -> Set<Vec> {
-        var visited: Set<Vec> = []
-        let start = plots.randomElement()!
-        var toVisit: [Vec] = [start]
-        
-        guard let garden = self.garden else {
-            fatalError("Garden is nil")
-        }
-
-        while !toVisit.isEmpty {
-            let curPos = toVisit.removeFirst()
-            visited.insert(curPos)
-
-            for dir in Direction.allCases {
-                let neighborPos = curPos + dir
-                guard garden.posIsValid(neighborPos) else {continue}
-                guard !visited.contains(neighborPos) else {continue}
-                guard !boundaryPlots.contains(neighborPos) else {continue}
-                toVisit.append(neighborPos)
-            }
-        }
-        
-        return visited
     }
 
     static func == (lhs: Region, rhs: Region) -> Bool {
@@ -187,33 +214,21 @@ fileprivate class Region: Equatable {
     }
 }
 
-fileprivate struct Hierarchy {
-    let node: Region?
-    var children: [Hierarchy]
-
-    init(node: Region?, children: [Hierarchy]) {
-        self.node = node
-        self.children = children
-    }
-
-    var isLeaf: Bool { children.isEmpty }
-}
-
 fileprivate class Garden {
-    let plots: [[Character]]
+    let plots: [Character]
     var regions: [Region] = []
-    let dims: (Int, Int)
+    let shape: (Int, Int)
 
-    init(plots: [[Character]]) {
+    init(contents plots: [Character], shape: (Int, Int)) {
         self.plots = plots
-        self.dims = (plots.count, plots[0].count)
+        self.shape = shape
         self.compute_regions()
     }
 
     func compute_regions() {
         var allVisited: Set<Vec> = []
-        for i in 0..<dims.0{
-            for j in 0..<dims.1 {
+        for i in 0..<shape.0{
+            for j in 0..<shape.1 {
                 let curPos = Vec(i, j)
                 guard !allVisited.contains(curPos) else {
                     continue
@@ -225,17 +240,22 @@ fileprivate class Garden {
         }
     }
 
-    func posIsValid(_ pos: Vec) -> Bool {
-        return pos.i >= 0 && pos.i < dims.0 && pos.j >= 0 && pos.j < dims.1
-    }
+    subscript(i: Int, j: Int) -> Character? {
+        guard i >= 0 && i < shape.0 && j >= 0 && j < shape.1 else {
+            return nil
+        }
 
-    func at(_ pos: Vec) -> Character {
-        return plots[pos.i][pos.j]
+        let trueIdx = i * shape.0 + j
+        return plots[trueIdx]
+    }
+    subscript(pos: Vec) -> Character? {
+        return self[pos.i, pos.j]
     }
 
     func getRegion(forPos pos: Vec, withVisited visited: inout Set<Vec>) -> Region {
         var regionPlots: Set<Vec> = []
         var toVisit: [Vec] = [pos]
+        guard let id = self[pos] else { fatalError("index out of bounds") }
         while !toVisit.isEmpty {
             let currentPos = toVisit.removeFirst()
             guard !visited.contains(currentPos) else {
@@ -245,28 +265,20 @@ fileprivate class Garden {
             regionPlots.insert(currentPos)
             for dir in Direction.allCases {
                 let neighborPos = currentPos + dir
-                guard posIsValid(neighborPos) else { continue }
-                if self.at(neighborPos) == self.at(currentPos) {
+                guard let neighborVal = self[neighborPos] else {continue}
+                if neighborVal == self[currentPos] {
                     toVisit.append(neighborPos)
                 }
             }
         }
 
-        return Region(id: self.at(pos), plots: regionPlots, parent: self)
-    }
-
-    func makeHierarchy() -> Hierarchy{
-        let root = Hierarchy(node: nil, children: [])
-        
-
-        return root
+        return Region(id: id, plots: regionPlots)
     }
 }
 
 
 func dayTwelve_partOne() {
-    let plots = parseInput(useTestCase: false)
-    let garden = Garden(plots: plots)
+    let garden = parseInput(useTestCase: false)
 
 
     let price = garden.regions.reduce(0) { (acc, region) in
@@ -277,11 +289,12 @@ func dayTwelve_partOne() {
 
 
 func dayTwelve_partTwo() {
-    let plots = parseInput(useTestCase: false)
-    let garden = Garden(plots: plots)
+    let garden = parseInput(useTestCase: false)
 
     let price = garden.regions.reduce(0) { (acc, region) in
-        acc + region.area * region.externalEdges
+        print("Region \(region.id) has area \(region.area) and \(region.edgeCount) edges")
+
+        return acc + region.area * region.edgeCount
     }
 
     print(price)
