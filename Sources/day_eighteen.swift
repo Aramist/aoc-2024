@@ -122,13 +122,14 @@ fileprivate enum Direction: CaseIterable, CustomStringConvertible {
 }
 
 fileprivate struct Trajectory: Comparable {
-    let states = [Vec]()
+    let states: [Vec]
     init(_ seq: [Vec]) {
         self.states = seq
     }
 
     var cost: Int {
-        states.count
+        // Number of steps is num states - 1 since we include the initial state
+        states.count - 1
     }
 
     static func >(lhs: Trajectory, rhs: Trajectory) -> Bool{
@@ -152,29 +153,29 @@ fileprivate struct Trajectory: Comparable {
     }
 }
 
-fileprivate struct Map { //: CustomStringConvertible {
+fileprivate struct Map: CustomStringConvertible {
     var accessible: [Bool]
     let shape: (height: Int, width: Int)
     var start: Vec
     var end: Vec
 
-    init(_ wallLocs: [(Int, Int)]) {
-        self.shape = (height: 7, width: 7)
+    init(_ wallLocs: [(Int, Int)], shape dims: (Int, Int)) {
+        self.shape = (height: dims.0, width: dims.1)
         self.accessible = Array(repeating: true, count: shape.height * shape.width)
+
+        start = Vec(0, 0)
+        end = Vec(shape.height - 1, shape.width - 1)
 
         for l in wallLocs {
             self[Vec(l.0, l.1)] = false
         }
-
-        start = Vec(0, 0)
-        end = Vec(shape.height - 1, shape.width - 1)
     }
 
-    // var description: String {
-    //     stride(from: 0, to: chars.count, by: shape.width).map {
-    //         String(chars[$0..<$0+shape.width].map{$0.rawValue})
-    //     }.joined(separator: "\n")
-    // }
+    var description: String {
+        stride(from: 0, to: accessible.count, by: shape.width).map {
+            String(accessible[$0..<$0+shape.width].map{$0 ? "." : "#"})
+        }.joined(separator: "\n")
+    }
 
     subscript(_ i: Int, _ j: Int) -> Bool{
         get {
@@ -222,7 +223,7 @@ fileprivate struct Map { //: CustomStringConvertible {
 }
 
 
-fileprivate func parseInput(useTestCase: Bool) -> [(Int, Int)] {
+fileprivate func parseInput(useTestCase: Bool) -> Map {
     let rawInput: String
 
     if useTestCase {
@@ -260,10 +261,21 @@ fileprivate func parseInput(useTestCase: Bool) -> [(Int, Int)] {
         rawInput = fileCont
     }
 
-    return rawInput.components(separatedBy: .newlines).map { (line: String) in
+    let locs = rawInput.components(separatedBy: .newlines).map { (line: String) in
         let comps = line.components(separatedBy: ",")
         return (Int(comps[0])!, Int(comps[1])!)
     }
+
+    let sizeLimit = useTestCase ? 12 : 1024
+    let walls = Array(locs[..<sizeLimit])
+    let shape = useTestCase ? (7, 7) : (71, 71)
+    return Map(walls, shape: shape)
 }
 
+
+func dayEighteen_partOne() {
+    let map = parseInput(useTestCase: false)
+    let bestPath = map.findBestPath()
+    print("Day 18 part one: \(bestPath.cost)")
+}
 

@@ -67,14 +67,28 @@ fileprivate struct Computer {
         }
         /** program:
         2,4  A mod 8 -> B
-        1,7  B ^ 7   -> B
+        1,7  B ^ 7   -> B  Inverts B
         7,5  A >> B  -> C
         0,3  A >> 3  -> A
-        1,7  B & 7   -> B
-        4,1  B ^ C   -> B
-        5,5  C % 8   -> OUT
+        1,7  B ^ 7   -> B  Restores original B
+        4,1  B ^ C   -> B  
+        5,5  B % 8   -> OUT  Outputs B xor the
         3,0  repeat floor(1/3 log2(A_0)) times
         */
+        // Outputs the Xor of the last three bits of A and bits k+2, k+1, and k where k is ~(a%8)
+        // Takes last three bits of A, inverts them, and 
+
+        // Desired output: 2,4,1,7,7,5,0,3,1,7,4,1,5,5,3,0
+        // last output: 000 = B ^ A>>(~B) => B = A>>(~B) 
+        // Minimized by making first 10 (shift 7 + op on 3) MSBs of A = 0
+        // A: 000 000 000 0
+        // Desired output 3: 011 = B ^ (A >> ~B)
+        // B = 011
+        // A: ...011
+        // Desired output 5: 101 = B ^ (A >> ~B)
+        // B = 101
+        // A: ...011 101
+
         
         // See comment on case 5
         instructionPointer += 1
@@ -106,6 +120,34 @@ fileprivate struct Computer {
         
         return outputs == target
     }
+}
+
+fileprivate func buildInputForDesiredOutput(desiredOutput: [Int]) -> Int {
+    let bits: UInt = 0
+    var digits = desiredOutput
+    digits.reverse()
+
+    if let bits = bitsForDigits(digits, existingBits: bits) {
+        return Int(bits)
+    }
+    fatalError("no solution found sadge")
+}
+
+fileprivate func bitsForDigits(_ digits: any Collection<Int>, existingBits bits: UInt) -> UInt? {
+    guard !digits.isEmpty else { return bits }
+    for B_c in 0..<8 {
+        let B = UInt(B_c)
+        let BInv = ~B & UInt(7)
+        let AwithB = (bits << 3) + B
+        let result = B ^ ((AwithB >> BInv) & UInt(7))
+        if Int(result) == digits.first {
+            let newBits = AwithB
+            if let future = bitsForDigits(digits.dropFirst(), existingBits: newBits) {
+                return future
+            } else { continue }
+        }
+    }
+    return nil
 }
 
 fileprivate func parseInput(useTestCase: Bool) -> Computer {
@@ -156,20 +198,13 @@ func daySeventeen_partTwo() {
         acc + [ins.opcode, ins.operand]
     }
 
-    var newA = 1 << (desiredOutput.count * 3 - 2)
-    // var newA = 117440
+    print(desiredOutput.map{String($0)}.joined(separator: ""))
+    let newA = buildInputForDesiredOutput(desiredOutput: desiredOutput)
+
+    // double check that the new A produces the desired output
     var copyComp = initialState
     copyComp.registers.A = newA
-
-    while !copyComp.producesOutput(desiredOutput) {
-        newA += 1
-        copyComp = initialState
-        copyComp.registers.A = newA
-    }
-    print(newA)
-
-    // Double check
-    copyComp = initialState
-    copyComp.registers.A = newA
-    print(copyComp.runProgram())
+    print("Desired: \(desiredOutput)")
+    print("Found: \(copyComp.runProgram())")
+    print("New A: \(newA)")
 }
