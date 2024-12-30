@@ -1,5 +1,5 @@
 import Foundation
-
+import opencv2
 
 fileprivate struct Vec: Hashable, Equatable, Comparable {
     var i: Int, j: Int
@@ -123,8 +123,11 @@ fileprivate enum Direction: CaseIterable, CustomStringConvertible {
 
 fileprivate struct Trajectory: Comparable {
     let states: [Vec]
-    init(_ seq: [Vec]) {
+    let goal: Vec?
+
+    init(_ seq: [Vec], goal: Vec? = nil) {
         self.states = seq
+        self.goal = goal
     }
 
     var cost: Int {
@@ -132,24 +135,32 @@ fileprivate struct Trajectory: Comparable {
         states.count - 1
     }
 
+    var comp: Int {
+        if let goal = goal {
+            let heuristic = abs(states.last!.i - goal.i) + abs(states.last!.j - goal.j)
+            return cost + heuristic
+        }
+        return cost
+    }
+
     static func >(lhs: Trajectory, rhs: Trajectory) -> Bool{
-        lhs.cost > rhs.cost
+        lhs.comp > rhs.comp
     }
 
     static func <(lhs: Trajectory, rhs: Trajectory) -> Bool{
-        lhs.cost < rhs.cost
+        lhs.comp < rhs.comp
     }
 
     static func +(lhs: Trajectory, rhs: Vec) -> Trajectory {
         var newSeq = lhs.states
         newSeq.append(rhs)
-        return Trajectory(newSeq)
+        return Trajectory(newSeq, goal: lhs.goal)
     }
 
     static func +(lhs: Trajectory, rhs: Direction) -> Trajectory {
         var newSeq = lhs.states
-        newSeq.append(rhs.getDiff())
-        return Trajectory(newSeq)
+        newSeq.append(lhs.states.last! + rhs.getDiff())
+        return Trajectory(newSeq, goal: lhs.goal)
     }
 }
 
@@ -167,7 +178,8 @@ fileprivate struct Map: CustomStringConvertible {
         end = Vec(shape.height - 1, shape.width - 1)
 
         for l in wallLocs {
-            self[Vec(l.0, l.1)] = false
+            // Locations are provided as x,y and stored as i,j so we transpose
+            self[Vec(l.1, l.0)] = false
         }
     }
 
@@ -175,6 +187,30 @@ fileprivate struct Map: CustomStringConvertible {
         stride(from: 0, to: accessible.count, by: shape.width).map {
             String(accessible[$0..<$0+shape.width].map{$0 ? "." : "#"})
         }.joined(separator: "\n")
+    }
+
+    func printTrajectory(_ traj: Trajectory) {
+        var trajMap = accessible.map{ $0 ? "." : "#"}
+        for state in traj.states {
+            trajMap[state.i * shape.width + state.j] = "O"
+        }
+
+        print(stride(from: 0, to: trajMap.count, by: shape.width).map {
+            trajMap[$0..<$0+shape.width].joined()
+        }.joined(separator: "\n"))
+    }
+    
+    func render() -> Mat{
+        let dataArray: [Int8] = Array(accessible.map {
+            $0 ? [-1, -1, -1] as [Int8] : [0, 0, 0] as [Int8] // 255, 255, 255 when read as uint8
+        }.joined())
+        let mapImg: Mat = Mat(
+            rows: Int32(shape.height),
+            cols: Int32(shape.width),
+            type: CvType.CV_8UC3,
+            data: dataArray
+        )
+        return mapImg
     }
 
     subscript(_ i: Int, _ j: Int) -> Bool{
@@ -196,11 +232,13 @@ fileprivate struct Map: CustomStringConvertible {
     }
 
     func findBestPath() -> Trajectory {
-        var queue = PriorityQueue(ascending: true, startingValues: [Trajectory([start])])
+        var queue = PriorityQueue(ascending: true, startingValues: [Trajectory([start], goal: end)])
         var visited: Set<Vec> = []
 
+        var steps = 0
         while let trajectory = queue.pop() {
             let curState = trajectory.states.last!
+            guard curState >= Vec(0, 0) && curState < Vec(shape.height, shape.width) else { continue }
             guard !visited.contains(curState) else { continue }
             visited.insert(curState)
 
@@ -210,7 +248,12 @@ fileprivate struct Map: CustomStringConvertible {
             if curState == end {
                 return trajectory
             }
-
+            
+            let img = self.render()
+            drawTrajectory(trajectory, on: img)
+            Imgcodecs.imwrite(filename: "movie/\(steps).png", img: img)
+            
+            steps += 1
             queue.push(trajectory + Direction.UP)
             queue.push(trajectory + Direction.DOWN)
             queue.push(trajectory + Direction.LEFT)
@@ -221,7 +264,6 @@ fileprivate struct Map: CustomStringConvertible {
         fatalError("Could not find a viable path")
     }
 }
-
 
 fileprivate func parseInput(useTestCase: Bool) -> Map {
     let rawInput: String
@@ -261,7 +303,7 @@ fileprivate func parseInput(useTestCase: Bool) -> Map {
         rawInput = fileCont
     }
 
-    let locs = rawInput.components(separatedBy: .newlines).map { (line: String) in
+    let locs = rawInput.split(separator: "\n").map { (line: any StringProtocol) in
         let comps = line.components(separatedBy: ",")
         return (Int(comps[0])!, Int(comps[1])!)
     }
@@ -272,10 +314,17 @@ fileprivate func parseInput(useTestCase: Bool) -> Map {
     return Map(walls, shape: shape)
 }
 
+fileprivate func drawTrajectory(_ traj: Trajectory, on img: Mat) {
+    for state in traj.states {
+        try! img.put(indices: [Int32(state.i), Int32(state.j)], data: [0, 0, 255] as [UInt8])
+    }
+}
+
 
 func dayEighteen_partOne() {
     let map = parseInput(useTestCase: false)
     let bestPath = map.findBestPath()
     print("Day 18 part one: \(bestPath.cost)")
+    // map.renderTrajectory(bestPath)
 }
 
