@@ -63,6 +63,12 @@ fileprivate struct Vec: Hashable, Equatable, Comparable {
     }
 }
 
+extension Vec: CustomStringConvertible {
+    var description: String {
+        "(\(i), \(j))"
+    }
+}
+
 fileprivate enum Direction: CaseIterable, CustomStringConvertible {
     case UP, RIGHT, DOWN, LEFT
     func getDiff() -> Vec {
@@ -169,6 +175,7 @@ fileprivate struct Map: CustomStringConvertible {
     let shape: (height: Int, width: Int)
     var start: Vec
     var end: Vec
+    let wallLocs: [Vec]
 
     init(_ wallLocs: [(Int, Int)], shape dims: (Int, Int)) {
         self.shape = (height: dims.0, width: dims.1)
@@ -176,6 +183,8 @@ fileprivate struct Map: CustomStringConvertible {
 
         start = Vec(0, 0)
         end = Vec(shape.height - 1, shape.width - 1)
+
+        self.wallLocs = wallLocs.map { Vec($0.0, $0.1) }
 
         for l in wallLocs {
             // Locations are provided as x,y and stored as i,j so we transpose
@@ -231,11 +240,11 @@ fileprivate struct Map: CustomStringConvertible {
         }
     }
 
-    func findBestPath() -> Trajectory {
+    func findBestPath() -> Trajectory? {
         var queue = PriorityQueue(ascending: true, startingValues: [Trajectory([start], goal: end)])
         var visited: Set<Vec> = []
 
-        var steps = 0
+        // var steps = 0
         while let trajectory = queue.pop() {
             let curState = trajectory.states.last!
             guard curState >= Vec(0, 0) && curState < Vec(shape.height, shape.width) else { continue }
@@ -249,11 +258,11 @@ fileprivate struct Map: CustomStringConvertible {
                 return trajectory
             }
             
-            let img = self.render()
-            drawTrajectory(trajectory, on: img)
-            Imgcodecs.imwrite(filename: "movie/\(steps).png", img: img)
+            // let img = self.render()
+            // drawTrajectory(trajectory, on: img)
+            // Imgcodecs.imwrite(filename: "movie/\(steps).png", img: img)
             
-            steps += 1
+            // steps += 1
             queue.push(trajectory + Direction.UP)
             queue.push(trajectory + Direction.DOWN)
             queue.push(trajectory + Direction.LEFT)
@@ -261,11 +270,47 @@ fileprivate struct Map: CustomStringConvertible {
         }
 
         // If we make it this far we are cooked
-        fatalError("Could not find a viable path")
+        return nil
+        // fatalError("Could not find a viable path")
+    }
+
+    func subsetWalls(_ wallIdx: Int) -> Map {
+        var copy = self
+        copy.accessible = Array(repeating: true, count: shape.height * shape.width)
+        for i in 0..<wallIdx {
+            copy[wallLocs[i]] = false
+        }
+        return copy
+    }
+
+    func binSearchPartTwo(low: Int = 0, high: Int = -1) -> Int {
+        let low = low
+        let high = high == -1 ? wallLocs.count : high
+
+        if high - low <= 10 {
+            for i in low..<high {
+                // Reset the map to use a subset of the walls
+                let map = subsetWalls(i)
+                let hasBestPath = map.findBestPath() != nil
+                if !hasBestPath {
+                    return i - 1
+                }
+            }
+            fatalError("We messed up. lo=\(low), hi=\(high)")
+        }
+
+        let mid = (low + high) / 2
+        let map = subsetWalls(mid)
+        let hasBestPath = map.findBestPath() != nil
+        if hasBestPath {
+            return binSearchPartTwo(low: mid, high: high)
+        } else {
+            return binSearchPartTwo(low: low, high: mid)
+        }
     }
 }
 
-fileprivate func parseInput(useTestCase: Bool) -> Map {
+fileprivate func parseInput(useTestCase: Bool, returnAll: Bool = false) -> Map {
     let rawInput: String
 
     if useTestCase {
@@ -309,7 +354,7 @@ fileprivate func parseInput(useTestCase: Bool) -> Map {
     }
 
     let sizeLimit = useTestCase ? 12 : 1024
-    let walls = Array(locs[..<sizeLimit])
+    let walls = returnAll ? locs : Array(locs[..<sizeLimit])
     let shape = useTestCase ? (7, 7) : (71, 71)
     return Map(walls, shape: shape)
 }
@@ -323,8 +368,14 @@ fileprivate func drawTrajectory(_ traj: Trajectory, on img: Mat) {
 
 func dayEighteen_partOne() {
     let map = parseInput(useTestCase: false)
-    let bestPath = map.findBestPath()
+    let bestPath = map.findBestPath()!
     print("Day 18 part one: \(bestPath.cost)")
-    // map.renderTrajectory(bestPath)
+}
+
+func dayEighteen_partTwo() {
+    let map = parseInput(useTestCase: false, returnAll: true)
+    let wallIdx = map.binSearchPartTwo()
+    print("Day 18 part two: \(wallIdx)")
+    print("Wall location: \(map.wallLocs[wallIdx])")
 }
 
